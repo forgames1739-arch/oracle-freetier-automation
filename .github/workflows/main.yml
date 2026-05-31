@@ -1,19 +1,26 @@
 name: Oracle Automation
+
 on:
   schedule:
-    - cron: '*/10 * * * *' # Запускать каждые 10 минут
+    - cron: '*/10 * * * *' # Запуск каждые 10 минут
   workflow_dispatch:      # Позволяет запускать вручную кнопкой
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
+          
       - name: Install dependencies
-        run: pip install oci
+        run: |
+          pip install oci
+          pip install requests
+          
       - name: Run script
         env:
           OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
@@ -23,4 +30,6 @@ jobs:
           OCI_REGION: ${{ secrets.OCI_REGION }}
           OCI_COMPARTMENT_OCID: ${{ secrets.OCI_COMPARTMENT_OCID }}
           OCI_SUBNET_OCID: ${{ secrets.OCI_SUBNET_OCID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python create_instance.py
