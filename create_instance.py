@@ -1,107 +1,140 @@
+#!/usr/bin/env python3
 import oci
 import os
-import requests
 import logging
+import time
+import sys
+from datetime import datetime
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
-def send_telegram_msg(text):
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
-    if token and chat_id:
-        url = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={text}"
-        try:
-            requests.get(url, timeout=10)
-        except Exception as e:
-            logger.error(f"Ошибка при отправке в Telegram: {e}")
+class OracleInstanceCreator:
+    def __init__(self):
+        self.config = {
+            "user": os.getenv("OCI_USER_OCID"),
+            "key_content": os.getenv("OCI_PRIVATE_KEY"),
+            "fingerprint": os.getenv("OCI_FINGERPRINT"),
+            "tenancy": os.getenv("OCI_TENANCY_OCID"),
+            "region": os.getenv("OCI_REGION")
+        }
+        if not all(self.config.values()):
+            raise ValueError("❌ Отсутствуют переменные окружения OCI!")
 
-def get_latest_image_id(compute_client, compartment_id):
-    try:
-        images = compute_client.list_images(
-            compartment_id=compartment_id,
-            shape="VM.Standard.A1.Flex",
-            operating_system="Oracle Linux",
-            operating_system_version="9"
-        ).data
-        if images:
-            return images[0].id
-    except Exception as e:
-        send_telegram_msg(f"❌ ОШИБКА: Не удалось получить ID образа. {str(e)[:50]}")
-    return None
+        self.compute_client = oci.core.ComputeClient(self.config)
+        self.identity_client = oci.identity.IdentityClient(self.config)
+        self.network_client = oci.core.VirtualNetworkClient(self.config)
+
+    def get_availability_domains(self, compartment_id):
+        try:
+            response = self.identity_client.list_availability_domains(compartment_id=compartment_id)
+            return [ad.name for ad in response.data]
+        except Exception as e:
+            logger.error(f"Error getting ADs: {e}")
+            return []
+
+    def get_vcn_and_subnet(self, compartment_id):
+        try:
+            vcn_response = self.network_client.list_vcns(compartment_id=compartment_id)
+            if not vcn_response.data:
+                return None, None
+            vcn_id = vcn_response.data[0].id
+
+            subnet_response = self.network_client.list_subnets(
+                compartment_id=compartment_id,
+                vcn_id=vcn_id
+            )
+            if not subnet_response.data:
+                return vcn_id, None
+            return vcn_id, subnet_response.data[0].id
+        except Exception as e:
+            logger.error(f"Error getting VCN/Subnet: {e}")
+            return None, None
+
+    def create_instance(self, compartment_id, availability_domain, subnet_id):
+        try:
+            launch_details = oci.core.models.LaunchInstanceDetails(
+                compartment_id=compartment_id,
+                display_name="always-free-arm",
+                image_id=self._get_ampere_image_id(compartment_id),
+                shape="VM.Standard.A1.Flex",
+                shape_config=oci.core.models.LaunchInstanceShapeConfigDetails(
+                    vcpus=4,
+                    memory_in_gbs=24
+                ),
+                availability_domain=availability_domain,
+                create_vnic_details=oci.core.models.CreateVnicDetails(
+                    subnet_id=subnet_id,
+                    assign_public_ip=True
+                )
+            )
+
+            response = self.compute_client.launch_instance(launch_details)
+            logger.info(f"✅ Instance created: {response.data.id}")
+            return response.data.id
+        except oci.exceptions.ServiceError as e:
+            if "out of capacity" in str(e).lower():
+                logger.warning("⚠ Out of capacity")
+                return None
+            else:
+                logger.error(f"❌ Service error: {e}")
+                raise
+        except Exception as e:
+            logger.error(f"❌ Unexpected error: {e}")
+            raise
+
+    def _get_ampere_image_id(self, compartment_id):
+        try:
+            response = self.compute_client.list_images(
+                compartment_id=compartment_id,
+                shape="VM.Standard.A1.Flex",
+                operating_system="Oracle Linux",
+                operating_system_version="9"
+            )
+            if response.data:
+                return response.data[0].id
+            return None
+        except Exception as e:
+            logger.warning(f"Error getting image: {e}")
+            return None
 
 def create_instance():
-    # Проверяем все нужные переменные окружения
-    config = {
-        "user": os.getenv("OCI_USER_OCID"),
-        "key_content": os.getenv("OCI_PRIVATE_KEY"),
-        "fingerprint": os.getenv("OCI_FINGERPRINT"),
-        "tenancy": os.getenv("OCI_TENANCY_OCID"),
-        "region": os.getenv("OCI_REGION")
-    }
+    compartment_id = os.getenv("OCI_COMPARTMENT_OCID")
+    subnet_id = os.getenv("OCI_SUBNET_OCID")
 
-    if not all(config.values()):
-        send_telegram_msg("❌ ОШИБКА: Отсутствуют переменные окружения OCI!")
+    if not compartment_id or not subnet_id:
+        logger.error("❌ compartment_id or subnet_id missing")
         return
 
-    try:
-        # Инициализация клиентов
-        compute_client = oci.core.ComputeClient(config)
-        identity_client = oci.identity.IdentityClient(config)
+    creator = OracleInstanceCreator()
 
-        compartment_id = os.getenv("OCI_COMPARTMENT_OCID")
-        subnet_id = os.getenv("OCI_SUBNET_OCID")
-       
-        # Защита от пустых значений
-        if not compartment_id or not subnet_id:
-            send_telegram_msg("❌ ОШИБКА: compartment_id или subnet_id отсутствуют")
-            return
-
-        image_id = get_latest_image_id(compute_client, compartment_id)
-        if not image_id:
-            return
-
-        # Получаем Availability Domain
-        ads = identity_client.list_availability_domains(compartment_id=compartment_id).data
+    while True:
+        logger.info(f"\n--- Новая попытка ({datetime.now().strftime('%H:%M')}) ---")
+        ads = creator.get_availability_domains(compartment_id)
         if not ads:
-            send_telegram_msg("❌ ОШИБКА: Нет доступных Availability Domains")
+            logger.error("❌ Нет AD")
+            time.sleep(60)
+            continue
+
+        vcn_id, sub = creator.get_vcn_and_subnet(compartment_id)
+        if not sub:
+            logger.error("❌ Нет subnet")
+            time.sleep(60)
+            continue
+
+        ad = ads[0]
+        logger.info(f"Используем AD: {ad}")
+
+        instance_id = creator.create_instance(compartment_id, ad, sub)
+        if instance_id:
+            logger.info("🎉 СЕРВЕР СОЗДАН! УРА!")
             return
-        ad_name = ads[0].name
-
-        # === ИСПРАВЛЕНО: правильная модель конфигурации формы ===
-        shape_config = oci.core.models.LaunchInstanceShapeConfigDetails(
-            vcpus=4,
-            memory_in_gbs=24
-        )
-
-        launch_details = oci.core.models.LaunchInstanceDetails(
-            compartment_id=compartment_id,
-            availability_domain=ad_name,
-            display_name="always-free-arm",
-            shape="VM.Standard.A1.Flex",
-            shape_config=shape_config,
-            source_details=oci.core.models.InstanceSourceViaImageDetails(image_id=image_id),
-            create_vnic_details=oci.core.models.CreateVnicDetails(
-                subnet_id=subnet_id,
-                assign_public_ip=True
-            )
-        )
-
-        response = compute_client.launch_instance(launch_details)
-        opc_id = response.headers.get("opc-request-id", "неизвестен")
-        
-        send_telegram_msg(f"✅ УРА! Сервер успешно создан!\n\nOPC-Request-ID: {opc_id}")
-        print(f"✅ Сервер создан! OPC-Request-ID: {opc_id}")
-
-    except oci.exceptions.ServiceError as e:
-        if "Out of capacity" in str(e):
-            send_telegram_msg("🔍 Охота продолжается: пока нет ресурсов.")
         else:
-            send_telegram_msg(f"⚠️ ОШИБКА: {str(e)[:100]}")
-    except KeyError as e:
-        send_telegram_msg(f"❌ ОШИБКА: Отсутствует переменная окружения: {e}")
-    except Exception as e:
-        send_telegram_msg(f"🚨 КРИТИЧЕСКАЯ ОШИБКА: {str(e)[:100]}")
+            logger.info("🔄 Нет capacity — ждём 60 секунд...")
+            time.sleep(60)
 
 if __name__ == "__main__":
     create_instance()
