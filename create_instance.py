@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
 Oracle Cloud Always Free ARM Ampere (4 ocpus / 24 GB)
-Рандомный интервал 5–10 минут — чтобы выглядело как человек
+Рандомный интервал 5–10 минут — работает ВЕЧНО
 """
 
 import oci
 import os
+import requests
 import logging
 import time
 import random
@@ -13,7 +14,11 @@ from datetime import datetime
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(message)s',
+    handlers=[
+        logging.FileHandler("oracle.log", encoding="utf-8"),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -26,15 +31,9 @@ def send_telegram_msg(text):
         except Exception:
             pass
 
-try:
-    import requests
-except ImportError:
-    send_telegram_msg = lambda x: None
-
 def main():
-    logger.info("🚀 Запуск Always Free ARM Ampere с рандомными интервалами...")
+    logger.info("🚀 Запуск Always Free ARM Ampere — ВЕЧНЫЙ РЕЖИМ")
 
-    # === Настройки (обязательно заполни в env или GitHub Secrets) ===
     compartment_id = os.getenv("OCI_COMPARTMENT_OCID")
     if not compartment_id:
         logger.error("❌ OCI_COMPARTMENT_OCID не найден")
@@ -56,20 +55,17 @@ def main():
     compute_client = oci.core.ComputeClient(config)
     identity_client = oci.identity.IdentityClient(config)
 
-    # === Получаем самый свежий образ Oracle Linux 9 ===
     image_id = get_latest_image_id(compute_client, compartment_id)
     if not image_id:
         logger.error("❌ Не удалось получить ID образа")
         return
 
-    # === Availability Domain ===
     ads = identity_client.list_availability_domains(compartment_id=compartment_id).data
     if not ads:
         logger.error("❌ Нет Availability Domains")
         return
     ad_name = ads[0].name
 
-    # === Shape config (ИСПРАВЛЕНО — только ocpus) ===
     shape_config = oci.core.models.LaunchInstanceShapeConfigDetails(
         ocpus=4,
         memory_in_gbs=24
@@ -93,24 +89,22 @@ def main():
         attempt += 1
         wait_minutes = random.randint(5, 10)
 
-        logger.info(f"\n🔄 Попытка №{attempt} — {datetime.now()}")
-        logger.info(f"⏳ Следующая охота через {wait_minutes} минут...")
-
+        logger.info(f"🔍 Новая охота в Always Free ARM Ampere через {wait_minutes} минут...")
         send_telegram_msg(f"🔍 Новая охота в Always Free ARM Ampere через {wait_minutes} минут...")
 
+        # === ИСПРАВЛЕНИЕ: просто sleep (не тратит минуты) ===
         time.sleep(wait_minutes * 60)
 
         try:
             response = compute_client.launch_instance(launch_details)
-            logger.info("="*70)
-            logger.info(f"🎉 УРААА! Сервер создан! ID: {response.data.id}")
-            logger.info("="*70)
+            logger.info("🎉 УРААА! Always Free сервер создан!")
+            logger.info(f"ID: {response.data.id}")
             send_telegram_msg("✅ УРА! Always Free сервер создан!")
-            return  # после успеха — выходим, чтобы не спамить
+            return
 
         except oci.exceptions.ServiceError as e:
             if "out of capacity" in str(e).lower() or "capacity" in str(e).lower():
-                logger.warning("⚠️ Ресурсы заняты. Продолжаем охоту...")
+                logger.info("🔍 Ресурсы заняты. Охота продолжается...")
                 send_telegram_msg("🔍 Ресурсы заняты. Охота продолжается...")
             else:
                 logger.error(f"❌ Ошибка: {str(e)[:150]}")
@@ -120,7 +114,7 @@ def main():
             logger.error(f"🚨 Неожиданная ошибка: {e}")
             send_telegram_msg(f"🚨 КРИТИКА: {str(e)[:100]}")
 
-        logger.info("⏳ Ждём полную минуту перед следующей проверкой...")
+        logger.info("⏳ Ждём 60 секунд перед следующей проверкой...")
         time.sleep(60)
 
 def get_latest_image_id(compute_client, compartment_id):
@@ -131,8 +125,7 @@ def get_latest_image_id(compute_client, compartment_id):
             operating_system="Oracle Linux",
             operating_system_version="9"
         ).data
-        if images:
-            return images[0].id
+        return images[0].id if images else None
     except Exception as e:
         logger.error(f"Ошибка получения образа: {e}")
     return None
