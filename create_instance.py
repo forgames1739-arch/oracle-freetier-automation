@@ -3,12 +3,10 @@ import os
 import requests
 import logging
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def send_telegram_msg(text):
-    """Отправка уведомлений в Telegram"""
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
     if token and chat_id:
@@ -19,7 +17,6 @@ def send_telegram_msg(text):
             logger.error(f"Ошибка при отправке в Telegram: {e}")
 
 def get_latest_image_id(compute_client, compartment_id):
-    """Поиск ID последнего образа Oracle Linux 9 для ARM"""
     try:
         images = compute_client.list_images(
             compartment_id=compartment_id,
@@ -27,10 +24,9 @@ def get_latest_image_id(compute_client, compartment_id):
             operating_system="Oracle Linux",
             operating_system_version="9"
         ).data
-        if images:
-            return images[0].id
+        if images: return images[0].id
     except Exception as e:
-        send_telegram_msg(f"❌ ОШИБКА КОДА: Не удалось получить ID образа. {str(e)[:50]}")
+        send_telegram_msg(f"❌ ОШИБКА: Не удалось получить ID образа. {str(e)[:50]}")
     return None
 
 def create_instance():
@@ -43,50 +39,39 @@ def create_instance():
     }
 
     try:
+        # Инициализируем оба клиента
         compute_client = oci.core.ComputeClient(config)
+        identity_client = oci.identity.IdentityClient(config) # Нужен для AD
+        
         compartment_id = os.getenv("OCI_COMPARTMENT_OCID")
         subnet_id = os.getenv("OCI_SUBNET_OCID")
         
-        # 1. Получаем ID образа
         image_id = get_latest_image_id(compute_client, compartment_id)
         if not image_id: return
 
-        # 2. Получаем Availability Domain
-        ads = compute_client.list_availability_domains(compartment_id=compartment_id).data
+        # Получаем Availability Domain через IdentityClient
+        ads = identity_client.list_availability_domains(compartment_id=compartment_id).data
         ad_name = ads[0].name
 
-        # 3. Формируем запрос
         launch_details = oci.core.models.LaunchInstanceDetails(
             compartment_id=compartment_id,
             availability_domain=ad_name,
             display_name="always-free-arm",
             shape="VM.Standard.A1.Flex",
-            shape_config=oci.core.models.LaunchInstanceShapeConfigDetails(
-                ocpus=4, 
-                memory_in_gbs=24
-            ),
-            source_details=oci.core.models.InstanceSourceViaImageDetails(
-                image_id=image_id
-            ),
-            create_vnic_details=oci.core.models.CreateVnicDetails(
-                subnet_id=subnet_id,
-                assign_public_ip=True
-            )
+            shape_config=oci.core.models.LaunchInstanceShapeConfigDetails(ocpus=4, memory_in_gbs=24),
+            source_details=oci.core.models.InstanceSourceViaImageDetails(image_id=image_id),
+            create_vnic_details=oci.core.models.CreateVnicDetails(subnet_id=subnet_id, assign_public_ip=True)
         )
         
-        # 4. Попытка создания
         compute_client.launch_instance(launch_details)
-        send_telegram_msg("✅ УРА! Сервер успешно создан в Oracle!")
+        send_telegram_msg("✅ УРА! Сервер успешно создан!")
         
     except oci.exceptions.ServiceError as e:
-        # Отчет №2: Охота продолжается
         if "Out of capacity" in str(e):
-            send_telegram_msg("🔍 Охота продолжается: в Оракле сейчас нет свободных ARM ресурсов.")
+            send_telegram_msg("🔍 Охота продолжается: пока нет ресурсов.")
         else:
-            # Отчет №1: Ошибка запроса
-            send_telegram_msg(f"⚠️ ОШИБКА Oracle (400/403): {str(e)[:100]}")
+            send_telegram_msg(f"⚠️ ОШИБКА: {str(e)[:100]}")
     except Exception as e:
-        # Отчет №1: Критическая ошибка
         send_telegram_msg(f"🚨 КРИТИЧЕСКАЯ ОШИБКА: {str(e)[:100]}")
 
 if __name__ == "__main__":
