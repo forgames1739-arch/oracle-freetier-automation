@@ -1,12 +1,25 @@
 #!/usr/bin/env python3
+"""
+Oracle Cloud Always Free ARM Ampere (4 ocpus / 24 GB)
+Рандомный интервал 5–10 минут — работает ВЕЧНО
+"""
+
 import oci
 import os
 import requests
 import logging
 import time
 import random
+from datetime import datetime
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(message)s',
+    handlers=[
+        logging.FileHandler("oracle.log", encoding="utf-8"),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
 def send_telegram_msg(text):
@@ -17,6 +30,92 @@ def send_telegram_msg(text):
             requests.get(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={text}", timeout=10)
         except Exception:
             pass
+
+def main():
+    logger.info("🚀 Запуск Always Free ARM Ampere — ВЕЧНЫЙ РЕЖИМ")
+
+    compartment_id = os.getenv("OCI_COMPARTMENT_OCID")
+    if not compartment_id:
+        logger.error("❌ OCI_COMPARTMENT_OCID не найден")
+        return
+
+    subnet_id = os.getenv("OCI_SUBNET_OCID")
+    config = {
+        "user": os.getenv("OCI_USER_OCID"),
+        "key_content": os.getenv("OCI_PRIVATE_KEY"),
+        "fingerprint": os.getenv("OCI_FINGERPRINT"),
+        "tenancy": os.getenv("OCI_TENANCY_OCID"),
+        "region": os.getenv("OCI_REGION"),
+    }
+
+    if not all(config.values()):
+        logger.error("❌ Отсутствуют переменные OCI!")
+        return
+
+    compute_client = oci.core.ComputeClient(config)
+    identity_client = oci.identity.IdentityClient(config)
+
+    image_id = get_latest_image_id(compute_client, compartment_id)
+    if not image_id:
+        logger.error("❌ Не удалось получить ID образа")
+        return
+
+    ads = identity_client.list_availability_domains(compartment_id=compartment_id).data
+    if not ads:
+        logger.error("❌ Нет Availability Domains")
+        return
+    ad_name = ads[0].name
+
+    shape_config = oci.core.models.LaunchInstanceShapeConfigDetails(
+        ocpus=4,
+        memory_in_gbs=24
+    )
+
+    launch_details = oci.core.models.LaunchInstanceDetails(
+        compartment_id=compartment_id,
+        display_name="always-free-arm",
+        image_id=image_id,
+        shape="VM.Standard.A1.Flex",
+        shape_config=shape_config,
+        availability_domain=ad_name,
+        create_vnic_details=oci.core.models.CreateVnicDetails(
+            subnet_id=subnet_id,
+            assign_public_ip=True
+        )
+    )
+
+    attempt = 0
+    while True:
+        attempt += 1
+        wait_minutes = random.randint(5, 10)
+
+        logger.info(f"🔍 Новая охота в Always Free ARM Ampere через {wait_minutes} минут...")
+        send_telegram_msg(f"🔍 Новая охота в Always Free ARM Ampere через {wait_minutes} минут...")
+
+        # === ИСПРАВЛЕНИЕ: просто sleep (не тратит минуты) ===
+        time.sleep(wait_minutes * 60)
+
+        try:
+            response = compute_client.launch_instance(launch_details)
+            logger.info("🎉 УРААА! Always Free сервер создан!")
+            logger.info(f"ID: {response.data.id}")
+            send_telegram_msg("✅ УРА! Always Free сервер создан!")
+            return
+
+        except oci.exceptions.ServiceError as e:
+            if "out of capacity" in str(e).lower() or "capacity" in str(e).lower():
+                logger.info("🔍 Ресурсы заняты. Охота продолжается...")
+                send_telegram_msg("🔍 Ресурсы заняты. Охота продолжается...")
+            else:
+                logger.error(f"❌ Ошибка: {str(e)[:150]}")
+                send_telegram_msg(f"⚠️ Ошибка: {str(e)[:100]}")
+
+        except Exception as e:
+            logger.error(f"🚨 Неожиданная ошибка: {e}")
+            send_telegram_msg(f"🚨 КРИТИКА: {str(e)[:100]}")
+
+        logger.info("⏳ Ждём 60 секунд перед следующей проверкой...")
+        time.sleep(60)
 
 def get_latest_image_id(compute_client, compartment_id):
     try:
@@ -29,68 +128,7 @@ def get_latest_image_id(compute_client, compartment_id):
         return images[0].id if images else None
     except Exception as e:
         logger.error(f"Ошибка получения образа: {e}")
-        return None
-
-def main():
-    logger.info("🚀 Запуск серии попыток создания сервера")
-
-    config = {
-        "user": os.getenv("OCI_USER_OCID"),
-        "key_content": os.getenv("OCI_PRIVATE_KEY"),
-        "fingerprint": os.getenv("OCI_FINGERPRINT"),
-        "tenancy": os.getenv("OCI_TENANCY_OCID"),
-        "region": os.getenv("OCI_REGION"),
-    }
-    compartment_id = os.getenv("OCI_COMPARTMENT_OCID")
-    subnet_id = os.getenv("OCI_SUBNET_OCID")
-
-    if not all(config.values()):
-        logger.error("❌ Отсутствуют переменные OCI!")
-        return
-
-    compute_client = oci.core.ComputeClient(config)
-    identity_client = oci.identity.IdentityClient(config)
-
-    image_id = get_latest_image_id(compute_client, compartment_id)
-    ads = identity_client.list_availability_domains(compartment_id=compartment_id).data
-    
-    if not image_id or not ads:
-        logger.error("❌ Не удалось получить ID образа или AD")
-        return
-
-    # Цикл на 4 попытки
-    for i in range(1, 5):
-        logger.info(f"🔍 Попытка {i} из 4...")
-        
-        try:
-            launch_details = oci.core.models.LaunchInstanceDetails(
-                compartment_id=compartment_id,
-                availability_domain=ads[0].name,
-                display_name="always-free-arm",
-                shape="VM.Standard.A1.Flex",
-                shape_config=oci.core.models.LaunchInstanceShapeConfigDetails(ocpus=4, memory_in_gbs=24),
-                source_details=oci.core.models.InstanceSourceViaImageDetails(image_id=image_id),
-                create_vnic_details=oci.core.models.CreateVnicDetails(subnet_id=subnet_id, assign_public_ip=True)
-            )
-            
-            compute_client.launch_instance(launch_details)
-            send_telegram_msg(f"✅ УРА! Сервер создан на {i}-й попытке!")
-            return # Успех, выходим
-
-        except oci.exceptions.ServiceError as e:
-            if "out of capacity" in str(e).lower():
-                logger.info(f"🔍 Нет ресурсов (попытка {i})")
-                if i < 4:
-                    time.sleep(600) # Пауза 10 минут перед следующей попыткой
-                else:
-                    send_telegram_msg("🔍 Все 4 попытки исчерпаны, ресурсов нет.")
-            else:
-                send_telegram_msg(f"⚠️ Ошибка: {str(e)[:50]}")
-                break
-        except Exception as e:
-            send_telegram_msg(f"🚨 Ошибка: {str(e)[:50]}")
-            break
+    return None
 
 if __name__ == "__main__":
     main()
-
