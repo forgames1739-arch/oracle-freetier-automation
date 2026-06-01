@@ -2,7 +2,9 @@ name: Oracle Automation
 
 on:
   schedule:
-    - cron: '*/10 * * * *'  # Запуск каждые 10 минут
+    # Запуск каждые 6 часов (на 5-й минуте часа). 
+    # Это надежно перезапустит ваш скрипт до истечения 6-часового лимита GitHub.
+    - cron: '5 */6 * * *'
   workflow_dispatch:      # Запуск кнопкой "Run workflow"
 
 jobs:
@@ -35,5 +37,3 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python create_instance.py
-          # Если хочешь, можно добавить вывод лога в GitHub Actions
-          # cat create_instance.py  # раскомментируй если нужно
