@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-Oracle Cloud Always Free ARM Ampere (4 vCPU, 24GB) — ИСПРАВЛЕНО 2026
+Oracle Cloud Always Free ARM Ampere (4 ocpus / 24 GB)
+Рандомный интервал 5–10 минут — чтобы выглядело как человек
 """
 
 import oci
 import os
 import logging
 import time
+import random
 from datetime import datetime
 
 logging.basicConfig(
@@ -19,33 +21,26 @@ def send_telegram_msg(text):
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
     if token and chat_id:
-        url = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={text}"
         try:
-            requests.get(url, timeout=10)  # requests нужно установить
-        except Exception as e:
-            logger.error(f"Ошибка Telegram: {e}")
+            requests.get(f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={text}", timeout=10)
+        except Exception:
+            pass
 
-# === ИМПОРТ (для send_telegram_msg) ===
 try:
     import requests
 except ImportError:
-    logger.warning("requests не установлен — Telegram отключён")
     send_telegram_msg = lambda x: None
 
 def main():
-    logger.info("🚀 Запуск Oracle Always Free ARM Ampere...")
+    logger.info("🚀 Запуск Always Free ARM Ampere с рандомными интервалами...")
 
-    # === НАСТРОЙКИ ===
+    # === Настройки (обязательно заполни в env или GitHub Secrets) ===
     compartment_id = os.getenv("OCI_COMPARTMENT_OCID")
     if not compartment_id:
         logger.error("❌ OCI_COMPARTMENT_OCID не найден")
         return
 
     subnet_id = os.getenv("OCI_SUBNET_OCID")
-    if not subnet_id:
-        logger.error("❌ OCI_SUBNET_OCID не найден")
-        return
-
     config = {
         "user": os.getenv("OCI_USER_OCID"),
         "key_content": os.getenv("OCI_PRIVATE_KEY"),
@@ -58,23 +53,25 @@ def main():
         logger.error("❌ Отсутствуют переменные OCI!")
         return
 
-    # Клиенты
     compute_client = oci.core.ComputeClient(config)
     identity_client = oci.identity.IdentityClient(config)
 
+    # === Получаем самый свежий образ Oracle Linux 9 ===
     image_id = get_latest_image_id(compute_client, compartment_id)
     if not image_id:
         logger.error("❌ Не удалось получить ID образа")
         return
 
+    # === Availability Domain ===
     ads = identity_client.list_availability_domains(compartment_id=compartment_id).data
     if not ads:
         logger.error("❌ Нет Availability Domains")
         return
     ad_name = ads[0].name
 
+    # === Shape config (ИСПРАВЛЕНО — только ocpus) ===
     shape_config = oci.core.models.LaunchInstanceShapeConfigDetails(
-        ocpus=4,                    # ИСПРАВЛЕНО! Только ocpus
+        ocpus=4,
         memory_in_gbs=24
     )
 
@@ -91,33 +88,39 @@ def main():
         )
     )
 
-    # ====================== РЕТРАЙ (бесконечный) ======================
     attempt = 0
     while True:
         attempt += 1
+        wait_minutes = random.randint(5, 10)
+
         logger.info(f"\n🔄 Попытка №{attempt} — {datetime.now()}")
+        logger.info(f"⏳ Следующая охота через {wait_minutes} минут...")
+
+        send_telegram_msg(f"🔍 Новая охота в Always Free ARM Ampere через {wait_minutes} минут...")
+
+        time.sleep(wait_minutes * 60)
 
         try:
             response = compute_client.launch_instance(launch_details)
-            instance_id = response.data.id
-            logger.info("="*60)
-            logger.info(f"🎉 СУПЕР! Сервер создан! ID: {instance_id}")
-            logger.info("="*60)
+            logger.info("="*70)
+            logger.info(f"🎉 УРААА! Сервер создан! ID: {response.data.id}")
+            logger.info("="*70)
             send_telegram_msg("✅ УРА! Always Free сервер создан!")
-            return
+            return  # после успеха — выходим, чтобы не спамить
 
         except oci.exceptions.ServiceError as e:
             if "out of capacity" in str(e).lower() or "capacity" in str(e).lower():
-                logger.warning(f"⚠️ Ресурсы заняты (Out of capacity). Охота продолжается...")
+                logger.warning("⚠️ Ресурсы заняты. Продолжаем охоту...")
                 send_telegram_msg("🔍 Ресурсы заняты. Охота продолжается...")
             else:
-                logger.error(f"❌ Сервисная ошибка: {str(e)[:150]}")
+                logger.error(f"❌ Ошибка: {str(e)[:150]}")
                 send_telegram_msg(f"⚠️ Ошибка: {str(e)[:100]}")
+
         except Exception as e:
             logger.error(f"🚨 Неожиданная ошибка: {e}")
             send_telegram_msg(f"🚨 КРИТИКА: {str(e)[:100]}")
 
-        logger.info("⏳ Ждём 60 секунд...")
+        logger.info("⏳ Ждём полную минуту перед следующей проверкой...")
         time.sleep(60)
 
 def get_latest_image_id(compute_client, compartment_id):
@@ -130,7 +133,6 @@ def get_latest_image_id(compute_client, compartment_id):
         ).data
         if images:
             return images[0].id
-        logger.warning("Образ не найден")
     except Exception as e:
         logger.error(f"Ошибка получения образа: {e}")
     return None
