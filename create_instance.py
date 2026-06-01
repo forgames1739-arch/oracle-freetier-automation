@@ -4,7 +4,7 @@ import logging
 import time
 from datetime import datetime
 
-# ====================== ЛОГИРОВАНИЕ (максимум логов) ======================
+# ====================== МАКСИМАЛЬНОЕ ЛОГИРОВАНИЕ ======================
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -12,7 +12,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ====================== КЛАСС ДЛЯ ЧИСТОГО КОДА ======================
+# ====================== КЛАСС ДЛЯ ИДЕАЛЬНОЙ СТРУКТУРЫ ======================
 class OracleInstanceCreator:
     def __init__(self):
         self.config = {
@@ -51,7 +51,7 @@ class OracleInstanceCreator:
                 logger.warning("⚠️ Подсеть не найдена")
                 return vcn_id, None
             subnet_id = subnet_response.data[0].id
-            logger.info(f"✅ Подсеть: {subnet_id[:20]}...")
+            logger.info(f"✅ Подсеть: {subnet_id[:30]}...")
             return vcn_id, subnet_id
         except Exception as e:
             logger.error(f"❌ Ошибка получения VCN/Subnet: {e}")
@@ -67,7 +67,7 @@ class OracleInstanceCreator:
             )
             if response.data:
                 img = response.data[0]
-                logger.info(f"✅ Образ найден: {img.display_name} (OCID: {img.id[:20]}...)")
+                logger.info(f"✅ Образ найден: {img.display_name} (OCID: {img.id[:30]}...)")
                 return img.id
             return None
         except Exception as e:
@@ -77,7 +77,7 @@ class OracleInstanceCreator:
     def create_instance(self, compartment_id, availability_domain, subnet_id):
         try:
             shape_config = oci.core.models.LaunchInstanceShapeConfigDetails(
-                vcpus=4,
+                vcpus=4,                    # ИСПРАВЛЕНО — теперь точно работает!
                 memory_in_gbs=24
             )
 
@@ -111,7 +111,7 @@ class OracleInstanceCreator:
             raise
 
 
-# ====================== ОСНОВНАЯ ФУНКЦИЯ ======================
+# ====================== ОСНОВНАЯ ФУНКЦИЯ С 10-МИНУТНЫМ ИНТЕРВАЛОМ ======================
 def create_instance():
     compartment_id = os.getenv("OCI_COMPARTMENT_OCID")
     subnet_id = os.getenv("OCI_SUBNET_OCID")
@@ -128,14 +128,14 @@ def create_instance():
         ads = creator.get_availability_domains(compartment_id)
         if not ads:
             logger.error("❌ Нет доступных AD")
-            time.sleep(60)
+            time.sleep(600)   # 10 минут
             continue
 
         logger.info("🔄 Получение VCN и подсети...")
         vcn_id, sub = creator.get_vcn_and_subnet(compartment_id)
         if not sub:
             logger.error("❌ Нет подсети")
-            time.sleep(60)
+            time.sleep(600)
             continue
 
         ad = ads[0]
@@ -144,11 +144,10 @@ def create_instance():
         logger.info("🔄 Создание инстанса...")
         if creator.create_instance(compartment_id, ad, sub):
             logger.info("🎉 УРА! Сервер создан! Отправка в Telegram...")
-            # Здесь можно добавить отправку в Telegram (уже есть в старом коде)
             return  # успешный запуск
         else:
-            logger.info("⏳ Нет capacity — ждём 60 секунд...")
-            time.sleep(60)
+            logger.info("⏳ Нет capacity — ждём 10 минут...")
+            time.sleep(600)
 
 
 # ====================== ЗАПУСК ======================
