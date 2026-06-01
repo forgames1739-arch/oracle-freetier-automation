@@ -31,6 +31,7 @@ def get_latest_image_id(compute_client, compartment_id):
     return None
 
 def create_instance():
+    # Проверяем все нужные переменные окружения
     config = {
         "user": os.getenv("OCI_USER_OCID"),
         "key_content": os.getenv("OCI_PRIVATE_KEY"),
@@ -46,18 +47,22 @@ def create_instance():
     try:
         # Инициализация клиентов
         compute_client = oci.core.ComputeClient(config)
-        identity_client = oci.identity.IdentityClient(config)  # ИСПРАВЛЕНО!
+        identity_client = oci.identity.IdentityClient(config)
 
         compartment_id = os.getenv("OCI_COMPARTMENT_OCID")
         subnet_id = os.getenv("OCI_SUBNET_OCID")
        
+        # Защита от пустых значений
+        if not compartment_id or not subnet_id:
+            send_telegram_msg("❌ ОШИБКА: compartment_id или subnet_id отсутствуют")
+            return
+
         image_id = get_latest_image_id(compute_client, compartment_id)
         if not image_id:
             return
 
         # Получаем Availability Domain
         ads = identity_client.list_availability_domains(compartment_id=compartment_id).data
-        print(f"✅ AD выбран: {ad_name}")
         if not ads:
             send_telegram_msg("❌ ОШИБКА: Нет доступных Availability Domains")
             return
@@ -74,16 +79,19 @@ def create_instance():
             availability_domain=ad_name,
             display_name="always-free-arm",
             shape="VM.Standard.A1.Flex",
-            shape_config=shape_config,          # вместо None
+            shape_config=shape_config,
             source_details=oci.core.models.InstanceSourceViaImageDetails(image_id=image_id),
             create_vnic_details=oci.core.models.CreateVnicDetails(
-                subnet_id=subnet_id, 
+                subnet_id=subnet_id,
                 assign_public_ip=True
             )
         )
 
-        compute_client.launch_instance(launch_details)
-        send_telegram_msg("✅ УРА! Сервер успешно создан!")
+        response = compute_client.launch_instance(launch_details)
+        opc_id = response.headers.get("opc-request-id", "неизвестен")
+        
+        send_telegram_msg(f"✅ УРА! Сервер успешно создан!\n\nOPC-Request-ID: {opc_id}")
+        print(f"✅ Сервер создан! OPC-Request-ID: {opc_id}")
 
     except oci.exceptions.ServiceError as e:
         if "Out of capacity" in str(e):
