@@ -57,6 +57,7 @@ def create_instance():
 
         # Получаем Availability Domain
         ads = identity_client.list_availability_domains(compartment_id=compartment_id).data
+        print(f"✅ AD выбран: {ad_name}")
         if not ads:
             send_telegram_msg("❌ ОШИБКА: Нет доступных Availability Domains")
             return
