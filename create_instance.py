@@ -24,7 +24,8 @@ def get_latest_image_id(compute_client, compartment_id):
             operating_system="Oracle Linux",
             operating_system_version="9"
         ).data
-        if images: return images[0].id
+        if images:
+            return images[0].id
     except Exception as e:
         send_telegram_msg(f"❌ ОШИБКА: Не удалось получить ID образа. {str(e)[:50]}")
     return None
@@ -39,18 +40,22 @@ def create_instance():
     }
 
     try:
-        # Инициализируем оба клиента
+        # Инициализируем клиентов
         compute_client = oci.core.ComputeClient(config)
-        identity_client = oci.identity.IdentityClient(config) # Нужен для AD
-        
+        identity_client = oci.identity.IdentityClient(config)  # IdentityClient (не ComputeClient!)
+
         compartment_id = os.getenv("OCI_COMPARTMENT_OCID")
         subnet_id = os.getenv("OCI_SUBNET_OCID")
         
         image_id = get_latest_image_id(compute_client, compartment_id)
-        if not image_id: return
+        if not image_id:
+            return
 
-        # Получаем Availability Domain через IdentityClient
+        # Получаем Availability Domain из IdentityClient (правильно!)
         ads = identity_client.list_availability_domains(compartment_id=compartment_id).data
+        if not ads:
+            send_telegram_msg("❌ ОШИБКА: Нет доступных Availability Domains")
+            return
         ad_name = ads[0].name
 
         launch_details = oci.core.models.LaunchInstanceDetails(
