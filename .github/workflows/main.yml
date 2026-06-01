@@ -2,8 +2,8 @@ name: Oracle Automation
 
 on:
   schedule:
-    - cron: '*/10 * * * *' # Запуск каждые 10 минут
-  workflow_dispatch:      # Позволяет запускать вручную кнопкой
+    - cron: '*/10 * * * *'  # Запуск каждые 10 минут
+  workflow_dispatch:      # Запуск кнопкой "Run workflow"
 
 jobs:
   build:
@@ -21,7 +21,7 @@ jobs:
         run: |
           pip install oci
           pip install requests
-          
+        
       - name: Run script
         env:
           OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
@@ -33,4 +33,7 @@ jobs:
           OCI_SUBNET_OCID: ${{ secrets.OCI_SUBNET_OCID }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python create_instance.py
+        run: |
+          python create_instance.py
+          # Если хочешь, можно добавить вывод лога в GitHub Actions
+          # cat create_instance.py  # раскомментируй если нужно
