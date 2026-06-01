@@ -2,14 +2,16 @@ name: Oracle Automation
 
 on:
   schedule:
-    # Запуск каждые 6 часов (на 5-й минуте часа). 
-    # Это надежно перезапустит ваш скрипт до истечения 6-часового лимита GitHub.
+    # Запуск каждые 6 часов
     - cron: '5 */6 * * *'
-  workflow_dispatch:      # Запуск кнопкой "Run workflow"
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Принудительно завершаем задачу через 5 часов 55 минут, 
+    # чтобы она не доходила до жесткого 6-часового лимита GitHub
+    timeout-minutes: 355 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -35,5 +37,4 @@ jobs:
           OCI_SUBNET_OCID: ${{ secrets.OCI_SUBNET_OCID }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          python create_instance.py
+        run: python create_instance.py
