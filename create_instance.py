@@ -85,9 +85,9 @@ def main():
     )
 
     while True:
-        # --- ВСТАВКА ЛОГИКИ ОЧЕРЕДИ ИЗ 5 ПОПЫТОК ---
+        # --- ВСТАВКА ЛОГИКИ ОЧЕРЕДИ ИЗ 3 ПОПЫТОК ---
         success = False
-        for i in range(5):
+        for i in range(3):
             try:
                 response = compute_client.launch_instance(launch_details)
                 logger.info("🎉 УРААА! Always Free сервер создан!")
@@ -108,7 +108,7 @@ def main():
                 send_telegram_msg(f"🚨 КРИТИКА: {str(e)[:100]}")
                 break
         
-        # Если после 5 попыток не вышло, уходим в обычный рандомный сон
+        # Если после 3 попыток не вышло, уходим в обычный рандомный сон
         wait_minutes = random.randint(5, 10)
         logger.info(f"🔍 Очередь из 3 попыток исчерпана. Ждем {wait_minutes} минут...")
         time.sleep(wait_minutes * 60)
