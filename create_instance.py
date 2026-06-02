@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Oracle Always Free ARM Hunter v2.4
-Укороченные интервалы + улучшенное логирование
+Oracle Always Free ARM Hunter v2.5
+Оптимизировано для GitHub Actions
 """
 
 import oci
@@ -11,7 +11,6 @@ import logging
 import time
 import random
 import sys
-import signal
 from typing import Optional
 
 # =========================
@@ -19,8 +18,8 @@ from typing import Optional
 # =========================
 
 MIN_WAIT = 120
-MAX_WAIT = 180          # ← Укоротили по твоей просьбе
-RUN_FOR_HOURS = 5.4     # Чуть меньше 6 часов для GitHub Actions
+MAX_WAIT = 180
+RUN_FOR_HOURS = 3.8     # Работает \~3 часа 48 минут (чтобы успеть до лимита GitHub)
 
 # =========================
 # TELEGRAM
@@ -135,7 +134,7 @@ def get_latest_image_id(compute_client, compartment_id: str) -> Optional[str]:
 
 def main():
     start_time = time.time()
-    tg_log("<b>🚀 Oracle Always Free ARM Hunter v2.4</b> запущен", "INFO")
+    tg_log("<b>🚀 Oracle Always Free ARM Hunter v2.5</b> запущен", "INFO")
 
     compartment_id = os.getenv("OCI_COMPARTMENT_OCID")
     subnet_id = os.getenv("OCI_SUBNET_OCID")
@@ -185,7 +184,7 @@ def main():
 
     while True:
         if (time.time() - start_time) / 3600 > RUN_FOR_HOURS:
-            tg_log("⏰ Достигнуто ограничение по времени (\~5.4ч). Останавливаемся.", "WARNING")
+            tg_log("⏰ Время работы почти закончилось. Останавливаемся до следующего запуска.", "WARNING")
             break
 
         attempt += 1
@@ -217,7 +216,7 @@ def main():
             if any(x in error_text for x in ["capacity", "out of host capacity", "limit exceeded", "not enough resources"]):
                 tg_log(f"🌍 Нет свободных ресурсов в AD.\nЖдём {wait_time} сек...", "WARNING")
             else:
-                tg_log(f"❌ OCI ошибка: {e.status} — {e.message}", "ERROR")
+                tg_log(f"❌ OCI ошибка: {e.status} | {e.code} | {e.message}", "ERROR")
                 time.sleep(60)
 
         except Exception as e:
