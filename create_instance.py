@@ -18,8 +18,8 @@ from typing import Optional
 # =========================
 
 MIN_WAIT = 120
-MAX_WAIT = 180
-RUN_FOR_HOURS = 3.8     # Работает \~3 часа 48 минут (чтобы успеть до лимита GitHub)
+MAX_WAIT = 150
+RUN_FOR_HOURS = 5.8     # Работает \~5 часов 50 минут (чтобы успеть до лимита GitHub)
 
 # =========================
 # TELEGRAM
