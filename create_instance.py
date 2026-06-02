@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Oracle Always Free ARM Hunter v2.3
-Улучшенное логирование + таймер GitHub Actions
+Oracle Always Free ARM Hunter v2.4
+Укороченные интервалы + улучшенное логирование
 """
 
 import oci
@@ -19,8 +19,8 @@ from typing import Optional
 # =========================
 
 MIN_WAIT = 120
-MAX_WAIT = 250
-RUN_FOR_HOURS = 5.4   # Чуть меньше 6 часов
+MAX_WAIT = 180          # ← Укоротили по твоей просьбе
+RUN_FOR_HOURS = 5.4     # Чуть меньше 6 часов для GitHub Actions
 
 # =========================
 # TELEGRAM
@@ -103,7 +103,7 @@ def instance_exists(compute_client, compartment_id: str) -> bool:
         active_states = {"PROVISIONING", "STARTING", "RUNNING", "STOPPING", "STOPPED", "CREATING_IMAGE"}
         for inst in instances:
             if inst.shape == "VM.Standard.A1.Flex" and inst.lifecycle_state in active_states:
-                tg_log(f"✅ Уже существует инстанс:\n• {inst.display_name} ({inst.id}) — {inst.lifecycle_state}", "WARNING")
+                tg_log(f"✅ Уже существует инстанс: {inst.display_name} ({inst.id})", "WARNING")
                 return True
         return False
     except Exception as e:
@@ -122,7 +122,7 @@ def get_latest_image_id(compute_client, compartment_id: str) -> Optional[str]:
         if not images:
             return None
         latest = max(images, key=lambda x: x.time_created)
-        tg_log(f"🖼️ Используем образ: {latest.display_name}", "INFO")
+        tg_log(f"🖼️ Используем образ: {latest.display_name}")
         return latest.id
     except Exception as e:
         tg_log(f"Ошибка получения образа: {e}", "ERROR")
@@ -135,7 +135,7 @@ def get_latest_image_id(compute_client, compartment_id: str) -> Optional[str]:
 
 def main():
     start_time = time.time()
-    tg_log("<b>🚀 Oracle Always Free ARM Hunter v2.3</b> запущен", "INFO")
+    tg_log("<b>🚀 Oracle Always Free ARM Hunter v2.4</b> запущен", "INFO")
 
     compartment_id = os.getenv("OCI_COMPARTMENT_OCID")
     subnet_id = os.getenv("OCI_SUBNET_OCID")
@@ -185,7 +185,7 @@ def main():
 
     while True:
         if (time.time() - start_time) / 3600 > RUN_FOR_HOURS:
-            tg_log("⏰ Время работы接近 6 часов. Останавливаем скрипт (GitHub Actions лимит).", "WARNING")
+            tg_log("⏰ Достигнуто ограничение по времени (\~5.4ч). Останавливаемся.", "WARNING")
             break
 
         attempt += 1
@@ -199,7 +199,7 @@ def main():
             instance = response.data
 
             tg_log(
-                f"<b>🎉 ИНСТАНС СОЗДАН УСПЕШНО!</b>\n\n"
+                f"<b>🎉 ИНСТАНС УСПЕШНО СОЗДАН!</b>\n\n"
                 f"<b>ID:</b> <code>{instance.id}</code>\n"
                 f"<b>AD:</b> {instance.availability_domain}\n"
                 f"4 OCPU • 24 GB",
@@ -215,7 +215,7 @@ def main():
 
             error_text = str(e).lower()
             if any(x in error_text for x in ["capacity", "out of host capacity", "limit exceeded", "not enough resources"]):
-                tg_log(f"🌍 <b>Нет свободных ресурсов</b> в Availability Domain.\nЖдём {wait_time} сек...", "WARNING")
+                tg_log(f"🌍 Нет свободных ресурсов в AD.\nЖдём {wait_time} сек...", "WARNING")
             else:
                 tg_log(f"❌ OCI ошибка: {e.status} — {e.message}", "ERROR")
                 time.sleep(60)
