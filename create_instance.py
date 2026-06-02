@@ -85,9 +85,9 @@ def main():
     )
 
     while True:
-        # --- ВСТАВКА ЛОГИКИ ОЧЕРЕДИ ИЗ 3 ПОПЫТОК ---
+        # --- ВСТАВКА ЛОГИКИ ОЧЕРЕДИ ИЗ 5 ПОПЫТОК ---
         success = False
-        for i in range(3):
+        for i in range(5):
             try:
                 response = compute_client.launch_instance(launch_details)
                 logger.info("🎉 УРААА! Always Free сервер создан!")
@@ -97,8 +97,8 @@ def main():
 
             except oci.exceptions.ServiceError as e:
                 if "out of capacity" in str(e).lower() or "capacity" in str(e).lower():
-                    logger.info(f"🔍 Попытка {i+1}: Ресурсы заняты. Пробуем еще через 2 сек...")
-                    time.sleep(2)
+                    logger.info(f"🔍 Попытка {i+1}: Ресурсы заняты. Пробуем еще через 5 сек...")
+                    time.sleep(5)
                 else:
                     logger.error(f"❌ Ошибка: {str(e)[:150]}")
                     send_telegram_msg(f"⚠️ Ошибка: {str(e)[:100]}")
@@ -108,7 +108,7 @@ def main():
                 send_telegram_msg(f"🚨 КРИТИКА: {str(e)[:100]}")
                 break
         
-        # Если после 3 попыток не вышло, уходим в обычный рандомный сон
+        # Если после 5 попыток не вышло, уходим в обычный рандомный сон
         wait_minutes = random.randint(5, 10)
         logger.info(f"🔍 Очередь из 3 попыток исчерпана. Ждем {wait_minutes} минут...")
         time.sleep(wait_minutes * 60)
