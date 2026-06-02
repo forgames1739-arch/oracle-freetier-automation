@@ -98,7 +98,7 @@ def main():
             except oci.exceptions.ServiceError as e:
                 if "out of capacity" in str(e).lower() or "capacity" in str(e).lower():
                     logger.info(f"🔍 Попытка {i+1}: Ресурсы заняты. Пробуем еще через 5 сек...")
-                    time.sleep(5)
+                    time.sleep(20)
                 else:
                     logger.error(f"❌ Ошибка: {str(e)[:150]}")
                     send_telegram_msg(f"⚠️ Ошибка: {str(e)[:100]}")
