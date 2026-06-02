@@ -2,8 +2,8 @@ name: Oracle ARM Hunter
 
 on:
   schedule:
-    - cron: '0 */4 * * *'      # Каждые 4 часа
-  workflow_dispatch:
+    - cron: '0 */5 * * *'     # Каждые 5 часов
+  workflow_dispatch:          # Ручной запуск
 
 jobs:
   hunt:
@@ -20,6 +20,9 @@ jobs:
       - name: Install dependencies
         run: pip install oci requests
 
+      - name: List files (debug)
+        run: ls -la
+
       - name: Run Oracle Hunter
         env:
           OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
@@ -31,4 +34,4 @@ jobs:
           OCI_SUBNET_OCID: ${{ secrets.OCI_SUBNET_OCID }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python oracle_hunter.py
+        run: python create_instance.py
