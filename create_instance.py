@@ -84,38 +84,34 @@ def main():
         )
     )
 
-    attempt = 0
     while True:
-        attempt += 1
+        # --- ВСТАВКА ЛОГИКИ ОЧЕРЕДИ ИЗ 3 ПОПЫТОК ---
+        success = False
+        for i in range(3):
+            try:
+                response = compute_client.launch_instance(launch_details)
+                logger.info("🎉 УРААА! Always Free сервер создан!")
+                logger.info(f"ID: {response.data.id}")
+                send_telegram_msg("✅ УРА! Always Free сервер создан!")
+                return # Успех, выходим полностью
+
+            except oci.exceptions.ServiceError as e:
+                if "out of capacity" in str(e).lower() or "capacity" in str(e).lower():
+                    logger.info(f"🔍 Попытка {i+1}: Ресурсы заняты. Пробуем еще через 2 сек...")
+                    time.sleep(2)
+                else:
+                    logger.error(f"❌ Ошибка: {str(e)[:150]}")
+                    send_telegram_msg(f"⚠️ Ошибка: {str(e)[:100]}")
+                    break 
+            except Exception as e:
+                logger.error(f"🚨 Неожиданная ошибка: {e}")
+                send_telegram_msg(f"🚨 КРИТИКА: {str(e)[:100]}")
+                break
+        
+        # Если после 3 попыток не вышло, уходим в обычный рандомный сон
         wait_minutes = random.randint(5, 10)
-
-        logger.info(f"🔍 Новая охота в Always Free ARM Ampere через {wait_minutes} минут...")
-        send_telegram_msg(f"🔍 Новая охота в Always Free ARM Ampere через {wait_minutes} минут...")
-
-        # === ИСПРАВЛЕНИЕ: просто sleep (не тратит минуты) ===
+        logger.info(f"🔍 Очередь из 3 попыток исчерпана. Ждем {wait_minutes} минут...")
         time.sleep(wait_minutes * 60)
-
-        try:
-            response = compute_client.launch_instance(launch_details)
-            logger.info("🎉 УРААА! Always Free сервер создан!")
-            logger.info(f"ID: {response.data.id}")
-            send_telegram_msg("✅ УРА! Always Free сервер создан!")
-            return
-
-        except oci.exceptions.ServiceError as e:
-            if "out of capacity" in str(e).lower() or "capacity" in str(e).lower():
-                logger.info("🔍 Ресурсы заняты. Охота продолжается...")
-                send_telegram_msg("🔍 Ресурсы заняты. Охота продолжается...")
-            else:
-                logger.error(f"❌ Ошибка: {str(e)[:150]}")
-                send_telegram_msg(f"⚠️ Ошибка: {str(e)[:100]}")
-
-        except Exception as e:
-            logger.error(f"🚨 Неожиданная ошибка: {e}")
-            send_telegram_msg(f"🚨 КРИТИКА: {str(e)[:100]}")
-
-        logger.info("⏳ Ждём 60 секунд перед следующей проверкой...")
-        time.sleep(60)
 
 def get_latest_image_id(compute_client, compartment_id):
     try:
