@@ -18,7 +18,7 @@ from typing import Optional
 # =========================
 
 MIN_WAIT = 120
-MAX_WAIT = 180
+MAX_WAIT = 150
 RUN_FOR_HOURS = 0.48
 
 # =========================
