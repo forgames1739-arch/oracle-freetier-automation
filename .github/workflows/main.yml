@@ -2,13 +2,13 @@ name: Oracle ARM Hunter
 
 on:
   schedule:
-    - cron: '5 */6 * * *'      # Запуск каждые 6 часов
+    - cron: '5 */5 * * *'      # Запуск каждые 5 часов
   workflow_dispatch:           # Возможность ручного запуска
 
 jobs:
   hunt:
     runs-on: ubuntu-latest
-    timeout-minutes: 355       # Безопасное завершение до лимита GitHub
+    timeout-minutes: 345       # Безопасное завершение до лимита GitHub
 
     steps:
       - name: Checkout code
