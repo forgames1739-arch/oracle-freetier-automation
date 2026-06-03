@@ -2,15 +2,17 @@ name: Oracle ARM Hunter
 
 on:
   schedule:
-    - cron: '*/30 * * * *'     # ← Запуск каждые 30 минут (самый надёжный вариант)
+    - cron: '5 */6 * * *'      # Каждые 6 часов
   workflow_dispatch:
 
 jobs:
   hunt:
     runs-on: ubuntu-latest
+    timeout-minutes: 355       # 5 часов 55 минут — безопасно до лимита GitHub
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
