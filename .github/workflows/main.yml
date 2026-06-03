@@ -2,8 +2,8 @@ name: Oracle ARM Hunter
 
 on:
   schedule:
-    - cron: '0 */5 * * *'     # Каждые 5 часов
-  workflow_dispatch:          # Ручной запуск
+    - cron: '*/30 * * * *'     # ← Запуск каждые 30 минут (самый надёжный вариант)
+  workflow_dispatch:
 
 jobs:
   hunt:
@@ -19,9 +19,6 @@ jobs:
 
       - name: Install dependencies
         run: pip install oci requests
-
-      - name: List files (debug)
-        run: ls -la
 
       - name: Run Oracle Hunter
         env:
