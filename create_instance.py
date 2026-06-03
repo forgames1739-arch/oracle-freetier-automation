@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Oracle Always Free ARM Hunter v2.5
-Оптимизировано для GitHub Actions
+Oracle Always Free ARM Hunter v2.6
+Оптимизировано для частых запусков каждые 30 минут
 """
 
 import oci
@@ -18,8 +18,8 @@ from typing import Optional
 # =========================
 
 MIN_WAIT = 120
-MAX_WAIT = 150
-RUN_FOR_HOURS = 4.8     # Работает \~4 часа 50 минут (чтобы успеть до лимита GitHub)
+MAX_WAIT = 180
+RUN_FOR_HOURS = 0.48
 
 # =========================
 # TELEGRAM
@@ -134,7 +134,7 @@ def get_latest_image_id(compute_client, compartment_id: str) -> Optional[str]:
 
 def main():
     start_time = time.time()
-    tg_log("<b>🚀 Oracle Always Free ARM Hunter v2.5</b> запущен", "INFO")
+    tg_log("<b>🚀 Oracle Always Free ARM Hunter v2.6</b> запущен", "INFO")
 
     compartment_id = os.getenv("OCI_COMPARTMENT_OCID")
     subnet_id = os.getenv("OCI_SUBNET_OCID")
@@ -184,7 +184,7 @@ def main():
 
     while True:
         if (time.time() - start_time) / 3600 > RUN_FOR_HOURS:
-            tg_log("⏰ Время работы почти закончилось. Останавливаемся до следующего запуска.", "WARNING")
+            tg_log("⏰ Сессия завершена. Ожидаем следующего запуска по расписанию.", "WARNING")
             break
 
         attempt += 1
