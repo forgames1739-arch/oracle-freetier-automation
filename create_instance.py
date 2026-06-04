@@ -186,13 +186,13 @@ def main():
 
         except oci.exceptions.ServiceError as e:
             if e.status == 429:
-                tg_log("⏳ 429 Too Many Requests — ждём 5 минут...", "WARNING")
-                time.sleep(300)
+                tg_log("⏳ 429 'Too Many Requests', ждём 2 минуты...", "WARNING")
+                time.sleep(120)
                 continue
 
             error_text = str(e).lower()
             if any(x in error_text for x in ["capacity", "out of host capacity", "not enough resources"]):
-                tg_log(f"🌍 Нет свободных ресурсов. Ждём {wait_time} сек...", "WARNING")
+                tg_log(f"🌍 Нет свободных ресурсов спустя {wait_time} сек", "WARNING")
             else:
                 tg_log(f"❌ OCI Error: {e.status} | {e.code} | {e.message}", "ERROR")
                 time.sleep(60)
