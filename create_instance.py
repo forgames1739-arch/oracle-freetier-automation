@@ -18,7 +18,7 @@ from datetime import datetime
 # =========================
 
 MIN_WAIT = 120
-MAX_WAIT = 150
+MAX_WAIT = 125
 RUN_FOR_HOURS = 4.8
 
 # =========================
@@ -163,7 +163,7 @@ def main():
     while True:
         # Проверка времени работы
         if (time.time() - start_time) / 3600 > RUN_FOR_HOURS:
-            tg_log("⏰ Достигнуто время работы (\~5ч 51м). Останавливаемся до следующего запуска.", "WARNING")
+            tg_log("⏰ Достигнуто время работы (\~5ч). Останавливаемся до следующего запуска.", "WARNING")
             break
 
         attempt += 1
