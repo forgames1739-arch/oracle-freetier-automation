@@ -6,7 +6,7 @@ on:
 jobs:
   hunt:
     runs-on: ubuntu-latest
-    timeout-minutes: 345
+    timeout-minutes: 355
     concurrency:
       group: oracle-hunter-job
       cancel-in-progress: true
