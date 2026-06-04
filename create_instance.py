@@ -19,7 +19,7 @@ from datetime import datetime
 
 MIN_WAIT = 120
 MAX_WAIT = 125
-RUN_FOR_HOURS = 4.8
+RUN_FOR_HOURS = 4.95
 
 # =========================
 # LOGGING
