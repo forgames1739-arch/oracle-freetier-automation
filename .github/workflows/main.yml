@@ -1,27 +1,24 @@
 name: Oracle ARM Hunter
 
 on:
-  schedule:
-    - cron: '5 */5 * * *'      # Запуск каждые 5 часов
-  workflow_dispatch:           # Возможность ручного запуска
+  workflow_dispatch:
 
 jobs:
   hunt:
     runs-on: ubuntu-latest
-    timeout-minutes: 345       # Безопасное завершение до лимита GitHub
-
+    timeout-minutes: 345
+    concurrency:
+      group: oracle-hunter-job
+      cancel-in-progress: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Install dependencies
         run: pip install oci requests
-
       - name: Run Oracle Hunter
         env:
           OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
